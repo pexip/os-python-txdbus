@@ -3,15 +3,15 @@ This module implements the wire-level DBus protocol.
 
 @author: Tom Cocagne
 """
-import struct
 import os.path
+import struct
 
-from   zope.interface import Interface
+import six
+from twisted.internet import interfaces, protocol
+from twisted.python import log
+from zope.interface import implementer, Interface
 
-from   twisted.internet import protocol, defer, error
-from   twisted.python import log
-
-from txdbus import message, error
+from txdbus import error, message
 
 _is_linux = False
 
@@ -34,7 +34,7 @@ class IDBusAuthenticator (Interface):
         @type protocol: L{BasicDBusProtocol}
         @param protocol: L{BasicDBusProtocol} instance requiring authentication
         """
-        
+
     def handleAuthMessage(self, line):
         """
         Handles an authentication message received on the connection. The
@@ -57,8 +57,7 @@ class IDBusAuthenticator (Interface):
         """
 
 
-
-
+@implementer(interfaces.IFileDescriptorReceiver)
 class BasicDBusProtocol(protocol.Protocol):
     """
     Basic class providing support for converting a stream of bytes into
@@ -68,90 +67,99 @@ class BasicDBusProtocol(protocol.Protocol):
     @ivar authenticator: Class used to authenticate connections
     @type authenticator: Class implementing L{IDBusAuthenticator}
     """
-    _buffer         = ''
-    _authenticated  = False
-    _nextMsgLen     = 0
-    _endian         = '<'
-    _client         = True
-    _firstByte      = True
-    _unix_creds     = None # (pid, uid, gid) from UnixSocket credential passing
-    authenticator   = None # Class to handle DBus authentication
-    authDelimiter   = '\r\n'
+    _buffer = b''
+    _receivedFDs = None
+    _authenticated = False
+    _nextMsgLen = 0
+    _endian = '<'
+    _client = True
+    _firstByte = True
+    _unix_creds = None  # (pid, uid, gid) from UnixSocket credential passing
+    authenticator = None  # Class to handle DBus authentication
+    authDelimiter = b'\r\n'
     MAX_AUTH_LENGTH = 16384
-    MAX_MSG_LENGTH  = 2**27
-    MSG_HDR_LEN     = 16 # including 4-byte padding for array of structure
+    MAX_MSG_LENGTH = 2**27
+    MSG_HDR_LEN = 16  # including 4-byte padding for array of structure
 
-    guid = None # Filled in with the GUID of the server (for client protocol)
-                # or the username of the authenticated client (for server protocol)
+    guid = None  # Filled in with the GUID of the server (for client protocol)
+    # or the username of the authenticated client (for server protocol)
 
     def connectionMade(self):
 
+        self._receivedFDs = []
         self.guid = None
-        
-        if self._client:
-            # DBus specification requires that clients send a null byte upon connection
-            # to the bus
-            self.transport.write('\0')
 
+        if self._client:
+            # DBus specification requires that clients send a null byte upon
+            # connection to the bus
+            self.transport.write(b'\0')
 
         if self._client:
             self._dbusAuth = IDBusAuthenticator(self.authenticator())
         else:
             self._dbusAuth = IDBusAuthenticator(self.authenticator(
-                                                       self.factory.bus.uuid ))
+                self.factory.bus.uuid))
         self._dbusAuth.beginAuthentication(self)
-        
-
 
     def dataReceived(self, data):
-        
+
         if self._authenticated:
             self._buffer = self._buffer + data
             buffer_len = len(self._buffer)
-            
-            if self._nextMsgLen == 0 and buffer_len >= 16:
-                if self._buffer[0] != 'l':
-                    self._endian = '>'
 
-                body_len = struct.unpack(self._endian + 'I', self._buffer[4:8]  )[0]
-                harr_len = struct.unpack(self._endian + 'I', self._buffer[12:16])[0]
+            if self._nextMsgLen == 0 and buffer_len >= 16:
+                # There would be multiple clients using different endians.
+                # Reset endian every time.
+                if self._buffer[:1] != b'l':
+                    self._endian = '>'
+                else:
+                    self._endian = '<'
+
+                body_len = struct.unpack(
+                    self._endian + 'I', self._buffer[4:8])[0]
+                harr_len = struct.unpack(
+                    self._endian + 'I', self._buffer[12:16])[0]
 
                 hlen = self.MSG_HDR_LEN + harr_len
 
-                padlen = hlen % 8 and (8 - hlen%8) or 0
+                padlen = hlen % 8 and (8 - hlen % 8) or 0
 
-                self._nextMsgLen = self.MSG_HDR_LEN + harr_len + padlen + body_len
-
+                self._nextMsgLen = (
+                    self.MSG_HDR_LEN
+                    + harr_len
+                    + padlen
+                    + body_len
+                )
 
             if self._nextMsgLen != 0 and buffer_len >= self._nextMsgLen:
-                raw_msg      = self._buffer[:self._nextMsgLen]
+                raw_msg = self._buffer[:self._nextMsgLen]
                 self._buffer = self._buffer[self._nextMsgLen:]
 
                 self._nextMsgLen = 0
-                
+
                 self.rawDBusMessageReceived(raw_msg)
-                
+
                 if self._buffer:
                     # Recursively process any other complete messages
-                    self.dataReceived('')
+                    self.dataReceived(b'')
         else:
             if not self._client and self._firstByte:
-                if not data[0] == '\0':
+                if six.byte2int(data) != 0:
                     self.transport.loseConnection()
                     return
                 self._firstByte = False
                 data = data[1:]
-                
+
                 if _is_linux:
                     import socket
-                    cd = self.transport.socket.getsockopt(socket.SOL_SOCKET,
-                                                          17, # SO_PEERCRED
-                                                          struct.calcsize('3i')
-                                                          )
-                    self._unix_creds = struct.unpack('3i',cd)
+                    cd = self.transport.socket.getsockopt(
+                        socket.SOL_SOCKET,
+                        17,  # SO_PEERCRED
+                        struct.calcsize('3i')
+                    )
+                    self._unix_creds = struct.unpack('3i', cd)
 
-                
-            lines  = (self._buffer+data).split(self.authDelimiter)
+            lines = (self._buffer + data).split(self.authDelimiter)
             self._buffer = lines.pop(-1)
             for line in lines:
                 if self.transport.disconnecting:
@@ -171,19 +179,21 @@ class BasicDBusProtocol(protocol.Protocol):
                             self._dbusAuth = None
                             self.setAuthenticationSucceeded()
                             if self._buffer:
-                                self.dataReceived('')
-                    except error.DBusAuthenticationFailed, e:
+                                self.dataReceived(b'')
+                    except error.DBusAuthenticationFailed as e:
                         log.msg('DBus Authentication failed: ' + str(e))
                         self.transport.loseConnection()
             else:
                 if len(self._buffer) > self.MAX_AUTH_LENGTH:
                     return self.authMessageLengthExceeded(self._buffer)
-            
 
-    #--------------------------------------------------------------------------
+    def fileDescriptorReceived(self, fd):
+        self._receivedFDs.append(fd)
+
+    # -------------------------------------------------------------------------
     # Authentication Message Handling
     #
-    
+
     def sendAuthMessage(self, msg):
         """
         Sends a message to the other end of the connection.
@@ -193,7 +203,6 @@ class BasicDBusProtocol(protocol.Protocol):
         """
         return self.transport.writeSequence((msg, self.authDelimiter))
 
-
     def authMessageLengthExceeded(self, line):
         """
         Called when the maximum line length has been reached. By default,
@@ -201,7 +210,6 @@ class BasicDBusProtocol(protocol.Protocol):
         """
         self.transport.loseConnection()
 
-        
     def setAuthenticationSucceeded(self):
         """
         Called by subclass when the authentication process completes. This
@@ -211,24 +219,26 @@ class BasicDBusProtocol(protocol.Protocol):
         self._authenticated = True
         self.connectionAuthenticated()
 
-        
     def connectionAuthenticated(self):
         """
         Called when the connection has been successfully authenticated
         """
 
-    #--------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # DBus Message Handling
     #
     def sendMessage(self, msg):
         """
         @type msg: L{message.DBusMessage}
-        @param msg: A L{message.DBusMessage} instance to send over the connection
+        @param msg: A L{message.DBusMessage} instance to send over the
+            connection
         """
         assert isinstance(msg, message.DBusMessage)
-        self.transport.write( msg.rawMessage )
-        
-    
+        if hasattr(msg, 'oobFDs') and msg.oobFDs:
+            for fd in msg.oobFDs:
+                self.transport.sendFileDescriptor(fd)
+        self.transport.write(msg.rawMessage)
+
     def rawDBusMessageReceived(self, rawMsg):
         """
         Called when the raw bytes for a complete DBus message are received
@@ -236,37 +246,40 @@ class BasicDBusProtocol(protocol.Protocol):
         @param rawMsg: Byte-string containing the complete message
         @type rawMsg: C{str}
         """
-        m  = message.parseMessage( rawMsg )
+        m = message.parseMessage(rawMsg, self._receivedFDs)
         mt = m._messageType
-            
-        if mt == 1:
-            self.methodCallReceived( m )
-        elif mt == 2:
-            self.methodReturnReceived( m )
-        elif mt == 3:
-            self.errorReceived( m )
-        elif mt == 4:
-            self.signalReceived( m )
 
+        # only remove the number of unix fds used by a message. This helps
+        # avoid a race condition where another message can be received after
+        # we receive the unix fd but before the associated unix fd message
+        # is received
+        if hasattr(m, 'unix_fds'):
+            self._receivedFDs = self._receivedFDs[m.unix_fds:]
+
+        if mt == 1:
+            self.methodCallReceived(m)
+        elif mt == 2:
+            self.methodReturnReceived(m)
+        elif mt == 3:
+            self.errorReceived(m)
+        elif mt == 4:
+            self.signalReceived(m)
 
     def methodCallReceived(self, mcall):
         """
         Called when a DBus METHOD_CALL message is received
         """
 
-    
     def methodReturnReceived(self, mret):
         """
         Called when a DBus METHOD_RETURN message is received
         """
 
-    
     def errorReceived(self, merr):
         """
         Called when a DBus ERROR message is received
         """
 
-    
     def signalReceived(self, msig):
         """
         Called when a DBus METHOD_CALL message is received
