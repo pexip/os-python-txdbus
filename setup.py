@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 DESCRIPTION = (
     'A native Python implementation of the DBus protocol for Twisted '
     'applications.'
@@ -32,10 +32,9 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: POSIX',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: Software Development :: Libraries',
         'Topic :: System :: Networking',
     ],

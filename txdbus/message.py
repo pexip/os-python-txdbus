@@ -59,7 +59,6 @@ class DBusMessage (object):
     sender = None
     destination = None
 
-
 #    def printSelf(self):
 #        mtype = { 1 : 'MethodCall',
 #                  2 : 'MethodReturn',
@@ -108,7 +107,7 @@ class DBusMessage (object):
 
         self.headers = []
 
-        for attr_name, code, is_required in _headerAttrs:
+        for attr_name, code, _ in _headerAttrs:
             hval = getattr(self, attr_name, None)
 
             if hval is not None:
@@ -210,6 +209,7 @@ class MethodCallMessage (DBusMessage):
         self.body = body
         self.expectReply = expectReply
         self.autoStart = autoStart
+        self.oobFDs = oobFDs
 
         self._marshal(oobFDs=oobFDs)
 

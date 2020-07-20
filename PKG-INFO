@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: txdbus
-Version: 1.1.0
+Version: 1.1.1
 Summary: A native Python implementation of the DBus protocol for Twisted applications.
 Home-page: https://github.com/cocagne/txdbus
 Author: Tom Cocagne
@@ -88,10 +88,9 @@ Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: POSIX
 Classifier: Programming Language :: Python :: 2.7
-Classifier: Programming Language :: Python :: 3.3
-Classifier: Programming Language :: Python :: 3.4
 Classifier: Programming Language :: Python :: 3.5
 Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
 Classifier: Topic :: Software Development :: Libraries
 Classifier: Topic :: System :: Networking
 Provides: txdbus
