@@ -1,3 +1,9 @@
+python-txdbus (1.1.1-0pexip1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 20 Jul 2020 15:47:04 +0100
+
 python-txdbus (1.0.3-3) pexip; urgency=medium
 
   * Rebuild in buster environment

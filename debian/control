@@ -2,12 +2,26 @@ Source: python-txdbus
 Section: python
 Priority: optional
 Maintainer: Pexip AS <packaging@pexip.com>
-Build-Depends: debhelper (>= 8.0.0), python-all (>= 2.6.6-3~), python-setuptools
-Standards-Version: 3.9.2
+Build-Depends:
+ debhelper (>= 9),
+ dh-python,
+ python-all,
+ python-setuptools,
+ python3-all,
+ python3-setuptools
+Standards-Version: 3.9.8
 Homepage: https://github.com/cocagne/txdbus
 
 Package: python-txdbus
 Architecture: all
 Depends: ${python:Depends}, ${misc:Depends}
+Provides: ${python:Provides}
+XB-Python-Version: ${python:Versions}
+Description: Native Python implementation of the DBus protocol.
+ Native Python implementation of the DBus protocol for Twisted.
+
+Package: python3-txdbus
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}
 Description: Native Python implementation of the DBus protocol.
  Native Python implementation of the DBus protocol for Twisted.
