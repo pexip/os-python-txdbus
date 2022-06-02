@@ -1,6 +1,7 @@
 python-txdbus (1.1.2-0pexip1) pexip; urgency=medium
 
   * New upstream release
+  * Only build python3 package.
 
  -- Mark Hymers <mark.hymers@pexip.com>  Thu, 02 Jun 2022 14:06:19 +0100
 
