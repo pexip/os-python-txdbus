@@ -11,6 +11,7 @@ Build-Depends:
  python3-setuptools
 Standards-Version: 3.9.8
 Homepage: https://github.com/cocagne/txdbus
+XS-Pexip-Python-Upstream: https://pypi.org txdbus
 
 Package: python-txdbus
 Architecture: all
