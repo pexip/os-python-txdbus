@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: txdbus
-Version: 1.1.1
+Version: 1.1.2
 Summary: A native Python implementation of the DBus protocol for Twisted applications.
 Home-page: https://github.com/cocagne/txdbus
 Author: Tom Cocagne
