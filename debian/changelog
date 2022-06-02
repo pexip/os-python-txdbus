@@ -1,3 +1,9 @@
+python-txdbus (1.1.2-0pexip2) pexip; urgency=medium
+
+  * Initial bullseye build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 02 Jun 2022 14:42:51 +0100
+
 python-txdbus (1.1.2-0pexip1) pexip; urgency=medium
 
   * New upstream release
